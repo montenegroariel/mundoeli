@@ -28,7 +28,7 @@ certificatesResolvers:
 http:
   routers:
     web-secure-router:
-      rule: 'Host(`pos.mundoeli.com.ar`)'
+      rule: 'Host(`app.mundoeli.com.ar`)'
       entryPoints:
         - web-secure
       middlewares:
@@ -39,7 +39,7 @@ http:
         certResolver: letsencrypt
 
     web-media-router:
-      rule: 'Host(`pos.mundoeli.com.ar`) && PathPrefix(`/media/`)'
+      rule: 'Host(`app.mundoeli.com.ar`) && PathPrefix(`/media/`)'
       entryPoints:
         - web-secure
       middlewares:
