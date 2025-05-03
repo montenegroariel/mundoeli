@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block title %}Buscar por Código de Barras{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="text-center">Buscar Producto por Código de Barras</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <input type="text" id="barcode" class="form-control form-control-lg" 
+                               placeholder="Escanea o ingresa el código de barras" autofocus>
+                        <small class="form-text text-muted">
+                            Ingresa el código de barras completo o presiona Enter para buscar
+                        </small>
+                    </div>
+                    
+                    <div id="error-message" class="alert alert-danger mt-4" style="display: none;">
+                    </div>
+
+                    <div id="products-list" class="mt-4" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Imagen</th>
+                                        <th>Nombre</th>
+                                        <th>Código</th>
+                                        <th>Precio</th>
+                                        <th>Stock</th>
+                                        <th>Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-table-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-center">Opciones de Pago</h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-primary btn-lg" id="mercadopago-btn">
+                            <i class="fas fa-credit-card me-2"></i>Pagar con MercadoPago
+                        </button>
+                        <button class="btn btn-success btn-lg" id="efectivo-btn">
+                            <i class="fas fa-money-bill-wave me-2"></i>Pagar en Efectivo
+                        </button>
+                        <button class="btn btn-info btn-lg" id="print-btn">
+                            <i class="fas fa-print me-2"></i>Imprimir Comprobante
+                        </button>
+                        <div class="text-center mt-3">
+                            <h4>Total: $<span id="total-amount">0.00</span></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block inline_javascript %}
+<script>
+const barcodeInput = document.getElementById('barcode');
+const totalAmountSpan = document.getElementById('total-amount');
+const mercadopagoBtn = document.getElementById('mercadopago-btn');
+const efectivoBtn = document.getElementById('efectivo-btn');
+const printBtn = document.getElementById('print-btn');
+
+// Configuración de la impresora Bluetooth
+let bluetoothDevice = null;
+let characteristicCache = null;
+
+// Función para verificar soporte de Web Bluetooth
+function isWebBluetoothSupported() {
+    if (!navigator.bluetooth) {
+        console.error('Web Bluetooth API no está soportada en este navegador');
+        return false;
+    }
+    return true;
+}
+
+// Función para conectar con la impresora Bluetooth
+async function connectPrinter() {
+    if (!isWebBluetoothSupported()) {
+        showError('Tu navegador no soporta Bluetooth. Por favor usa Chrome, Edge o un navegador basado en Chromium.');
+        return false;
+    }
+
+    try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'IT01' },
+                { namePrefix: 'Printer' }
+            ],
+            // Solicitamos todos los servicios disponibles
+            optionalServices: ['generic_access', 'generic_attribute', '000018f0-0000-1000-8000-00805f9b34fb']
+        });
+        
+        console.log('Dispositivo seleccionado:', bluetoothDevice.name);
+        
+        const server = await bluetoothDevice.gatt.connect();
+        console.log('Servidor GATT conectado');
+        
+        // Obtener todos los servicios disponibles
+        const services = await server.getPrimaryServices();
+        console.log('Servicios disponibles:', services.length);
+        
+        for (const service of services) {
+            console.log('Servicio encontrado:', service.uuid);
+            
+            // Obtener todas las características del servicio
+            const characteristics = await service.getCharacteristics();
+            console.log(`Características para servicio ${service.uuid}:`, characteristics.length);
+            
+            for (const characteristic of characteristics) {
+                console.log('- Característica:', characteristic.uuid);
+                if (characteristic.properties.write) {
+                    console.log('  (Esta característica permite escritura)');
+                    characteristicCache = characteristic;
+                }
+            }
+        }
+        
+        if (!characteristicCache) {
+            throw new Error('No se encontró una característica con permisos de escritura');
+        }
+        
+        console.log('Usando característica:', characteristicCache.uuid);
+        return true;
+    } catch (error) {
+        console.error('Error detallado al conectar con la impresora:', error);
+        let errorMessage = 'Error al conectar con la impresora. ';
+        
+        if (error.name === 'NotFoundError') {
+            errorMessage += 'No se encontró la impresora. Asegúrate de que esté encendida y cerca.';
+        } else if (error.name === 'SecurityError') {
+            errorMessage += 'El usuario denegó el acceso al Bluetooth.';
+        } else if (error.name === 'NotSupportedError') {
+            errorMessage += 'Tu dispositivo no soporta Bluetooth o el servicio requerido.';
+        } else {
+            errorMessage += 'Verifica que la impresora esté encendida y cerca. ' + error.message;
+        }
+        
+        showError(errorMessage);
+        return false;
+    }
+}
+
+// Función para actualizar el stock de productos
+async function updateProductStock(products) {
+    try {
+        const response = await fetch('/products/api/update-stock/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ products })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Error al actualizar el stock');
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error al actualizar stock:', error);
+        showError('Error al actualizar el stock de productos: ' + error.message);
+        return false;
+    }
+}
+
+// Función para obtener el CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Función para generar y enviar el comprobante
+async function printReceipt() {
+    if (!characteristicCache) {
+        const connected = await connectPrinter();
+        if (!connected) return;
+    }
+
+    try {
+        // Recolectar productos y cantidades
+        const rows = document.querySelectorAll('#products-table-body tr');
+        const productsToUpdate = [];
+        
+        rows.forEach(row => {
+            const productId = row.getAttribute('data-product-id');
+            const quantity = parseInt(row.querySelector('input[type="number"]').value);
+            if (quantity > 0) {
+                productsToUpdate.push({
+                    id: productId,
+                    quantity: quantity
+                });
+            }
+        });
+
+        // Actualizar el stock antes de imprimir
+        const stockUpdated = await updateProductStock(productsToUpdate);
+        if (!stockUpdated) {
+            throw new Error('No se pudo actualizar el stock');
+        }
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString();
+        const timeStr = now.toLocaleTimeString();
+        
+        // Formato del comprobante (ajustado para 32 caracteres por línea - impresora 58mm)
+        let receipt = [
+            '\x1B\x40',  // Inicializar impresora
+            '\x1B\x61\x01',  // Centrar texto
+            'MundoEli\n',
+            '--------------------------------\n',
+            `Fecha: ${dateStr}\n`,
+            `Hora: ${timeStr}\n`,
+            '--------------------------------\n',
+            '\x1B\x61\x00',  // Alinear a la izquierda
+        ];
+
+        // Agregar productos
+        rows.forEach(row => {
+            const name = row.querySelector('td:nth-child(2)').textContent;
+            const price = row.querySelector('td:nth-child(4)').textContent;
+            const quantity = row.querySelector('input[type="number"]').value;
+            const subtotal = parseFloat(price.replace('$', '')) * parseInt(quantity);
+
+            // Formatear nombre del producto (máximo 20 caracteres)
+            const shortName = name.length > 20 ? name.substring(0, 17) + '...' : name.padEnd(20);
+            
+            receipt.push(
+                `${shortName}\n`,
+                `${quantity}x ${price} = $${subtotal.toFixed(2)}\n`
+            );
+        });
+
+        receipt.push(
+            '--------------------------------\n',
+            '\x1B\x61\x01',  // Centrar texto
+            `TOTAL: $${totalAmountSpan.textContent}\n`,
+            '\n',
+            'Gracias por su compra!\n',
+            '\n\n\n'  // Avance de papel
+        );
+
+        try {
+            // Enviar el comprobante a la impresora
+            const encoder = new TextEncoder();
+            for (const line of receipt) {
+                await characteristicCache.writeValue(encoder.encode(line));
+            }
+            showMessage('Comprobante impreso correctamente', 'success');
+        } catch (error) {
+            console.error('Error al imprimir:', error);
+            showError('Error al imprimir el comprobante');
+        }
+    } catch (error) {
+        console.error('Error al imprimir:', error);
+        showError('Error al imprimir el comprobante: ' + error.message);
+    }
+}
+
+// Event listener para el botón de imprimir
+printBtn.addEventListener('click', async function() {
+    const total = parseFloat(totalAmountSpan.textContent);
+    if (total <= 0) {
+        showError('Agregue productos antes de imprimir el comprobante');
+        return;
+    }
+
+    try {
+        showMessage('Conectando con la impresora...', 'info');
+        await printReceipt();
+    } catch (error) {
+        console.error('Error al imprimir:', error);
+        showError('Error al imprimir el comprobante: ' + error.message);
+    }
+});
+
+// Función para calcular y actualizar el total
+function updateTotal() {
+    console.log('Actualizando total...'); // Debug
+    const tbody = document.getElementById('products-table-body');
+    let total = 0;
+    
+    tbody.querySelectorAll('tr').forEach(row => {
+        const priceText = row.querySelector('td:nth-child(4)').textContent;
+        const price = parseFloat(priceText.replace('$', ''));
+        const quantity = parseInt(row.querySelector('input[type="number"]').value);
+        const subtotal = price * quantity;
+        console.log(`Precio: ${price}, Cantidad: ${quantity}, Subtotal: ${subtotal}`); // Debug
+        total += subtotal;
+    });
+    
+    console.log(`Total final: ${total}`); // Debug
+    totalAmountSpan.textContent = total.toFixed(2);
+}
+
+// Agregar event listener para cambios en cantidades
+document.addEventListener('DOMContentLoaded', function() {
+    const productsList = document.getElementById('products-table-body');
+    
+    // Usar delegación de eventos para los inputs de cantidad
+    productsList.addEventListener('input', function(e) {
+        if (e.target.type === 'number') {
+            console.log('Cantidad cambiada manualmente'); // Debug
+            updateTotal();
+        }
+    });
+});
+
+barcodeInput.addEventListener('keyup', function(e) {
+    const query = this.value.trim();
+    
+    if (e.key === 'Enter' && query) {
+        searchProducts(query);
+    }
+});
+
+function searchProducts(query) {
+    showMessage('Buscando...', 'info');
+    
+    fetch(`/products/api/search-by-barcode/?barcode=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            barcodeInput.value = '';
+            barcodeInput.focus();
+            
+            if (data.error) {
+                showError(data.error);
+                clearProductsList();
+            } else {
+                showProducts(data.products);
+                hideMessage();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Error al buscar productos. Por favor, intenta nuevamente.');
+            clearProductsList();
+            barcodeInput.value = '';
+            barcodeInput.focus();
+        });
+}
+
+function showProducts(products) {
+    const tbody = document.getElementById('products-table-body');
+    
+    products.forEach(product => {
+        const existingRow = Array.from(tbody.querySelectorAll('tr')).find(row => {
+            const barcodeCell = row.querySelector('td:nth-child(3)');
+            return barcodeCell && barcodeCell.textContent === product.barcode;
+        });
+
+        if (existingRow) {
+            const quantityInput = existingRow.querySelector('input[type="number"]');
+            const currentQuantity = parseInt(quantityInput.value);
+            quantityInput.value = currentQuantity + 1;
+            console.log('Incrementando cantidad de producto existente'); // Debug
+            updateTotal();
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    ${product.image_url 
+                        ? `<img src="${product.image_url}" alt="${product.name}" style="max-height: 50px;">` 
+                        : '<span class="text-muted">Sin imagen</span>'}
+                </td>
+                <td>${product.name}</td>
+                <td>${product.barcode || '-'}</td>
+                <td>$${product.price}</td>
+                <td>${product.stock}</td>
+                <td><input type="number" class="form-control form-control-sm" value="1" min="1"></td>
+            `;
+            row.setAttribute('data-product-id', product.id);
+            tbody.appendChild(row);
+            console.log('Agregando nuevo producto'); // Debug
+            updateTotal();
+        }
+    });
+    
+    document.getElementById('products-list').style.display = 'block';
+}
+
+// Manejadores de botones de pago
+mercadopagoBtn.addEventListener('click', function() {
+    const total = parseFloat(totalAmountSpan.textContent);
+    if (total <= 0) {
+        showError('Agregue productos antes de proceder al pago');
+        return;
+    }
+    alert('Redirigiendo a MercadoPago...');
+});
+
+efectivoBtn.addEventListener('click', function() {
+    const total = parseFloat(totalAmountSpan.textContent);
+    if (total <= 0) {
+        showError('Agregue productos antes de proceder al pago');
+        return;
+    }
+    alert('Procesando pago en efectivo...');
+});
+
+function clearProductsList() {
+    document.getElementById('products-list').style.display = 'none';
+    document.getElementById('products-table-body').innerHTML = '';
+    updateTotal();
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function showMessage(message, type = 'danger') {
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.textContent = message;
+    errorDiv.className = `alert alert-${type} mt-4`;
+    errorDiv.style.display = 'block';
+}
+
+function hideMessage() {
+    document.getElementById('error-message').style.display = 'none';
+}
+</script>
+{% endblock %}

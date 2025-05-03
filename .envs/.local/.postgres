@@ -1,0 +1,9 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=mundoeli
+POSTGRES_USER=TyjrWfptrZqKrGFwYQmPvRCsCUSHhJQn
+POSTGRES_PASSWORD=d4vyWmXdm6scG2zyLZY97ZzmpPXlk9tRmDF5ZQkWUHBk1aOPxogdaKcQyhBubT6s
+DATABASE_URL="postgres://TyjrWfptrZqKrGFwYQmPvRCsCUSHhJQn:NhUyjDXIIRnbw9MbeQiQ9PK2nmW8NpPl8B2NN0bghKqLq43Ar8qXKmgUo7z27A88@postgres:5432/mundoeli"
+
