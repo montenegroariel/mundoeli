@@ -11,11 +11,23 @@
                     <h2 class="text-center">Buscar Producto por Código de Barras</h2>
                 </div>
                 <div class="card-body">
-                    <div class="form-group">
+                    <div class="form-group mb-3">
                         <input type="text" id="barcode" class="form-control form-control-lg" 
                                placeholder="Escanea o ingresa el código de barras" autofocus>
                         <small class="form-text text-muted">
                             Ingresa el código de barras completo o presiona Enter para buscar
+                        </small>
+                    </div>
+                    <div class="form-group position-relative">
+                        <input type="text" id="product-name" class="form-control form-control-lg" 
+                               placeholder="O busca por nombre del producto" autocomplete="off">
+                        <div id="search-suggestions" class="position-absolute w-100 mt-1 d-none">
+                            <div class="list-group shadow-sm" style="max-height: 300px; overflow-y: auto;">
+                                <!-- Las sugerencias se insertarán aquí dinámicamente -->
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">
+                            Empieza a escribir para ver sugerencias
                         </small>
                     </div>
                     
@@ -339,18 +351,116 @@ barcodeInput.addEventListener('keyup', function(e) {
     const query = this.value.trim();
     
     if (e.key === 'Enter' && query) {
-        searchProducts(query);
+        searchProducts(query, 'barcode');
     }
 });
 
-function searchProducts(query) {
+const productNameInput = document.getElementById('product-name');
+let searchTimeout = null;
+const suggestionsContainer = document.getElementById('search-suggestions');
+
+productNameInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+        suggestionsContainer.classList.add('d-none');
+        return;
+    }
+
+    // Debounce la búsqueda para evitar demasiadas peticiones
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        searchProductSuggestions(query);
+    }, 300);
+});
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', function(e) {
+    if (!productNameInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+        suggestionsContainer.classList.add('d-none');
+    }
+});
+
+function searchProductSuggestions(query) {
     showMessage('Buscando...', 'info');
     
-    fetch(`/products/api/search-by-barcode/?barcode=${encodeURIComponent(query)}`)
+    fetch(`/products/api/search-by-name/?name=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
-            barcodeInput.value = '';
-            barcodeInput.focus();
+            if (data.error) {
+                showError(data.error);
+            } else {
+                displaySuggestions(data.products);
+                hideMessage();
+            }
+        })
+        .catch(error => {
+            showError('Error al buscar productos');
+            console.error('Error:', error);
+        });
+}
+
+function displaySuggestions(products) {
+    const suggestionsList = suggestionsContainer.querySelector('.list-group');
+    suggestionsList.innerHTML = '';
+    
+    if (products.length === 0) {
+        suggestionsList.innerHTML = `
+            <div class="list-group-item text-muted">
+                No se encontraron productos
+            </div>`;
+    } else {
+        products.forEach(product => {
+            const item = document.createElement('button');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${product.name}</strong>
+                        <br>
+                        <small class="text-muted">Código: ${product.barcode}</small>
+                    </div>
+                    <div class="text-right">
+                        <span class="badge bg-primary">$${product.price}</span>
+                        <br>
+                        <small class="text-muted">Stock: ${product.stock}</small>
+                    </div>
+                </div>`;
+            
+            item.addEventListener('click', () => {
+                selectProduct(product);
+            });
+            
+            suggestionsList.appendChild(item);
+        });
+    }
+    
+    suggestionsContainer.classList.remove('d-none');
+}
+
+function selectProduct(product) {
+    productNameInput.value = '';
+    suggestionsContainer.classList.add('d-none');
+    showProducts([product]);
+    hideMessage();
+}
+
+function searchProducts(query, searchType = 'barcode') {
+    showMessage('Buscando...', 'info');
+    
+    const searchParam = searchType === 'barcode' ? 'barcode' : 'name';
+    const endpoint = searchType === 'barcode' ? 'search-by-barcode' : 'search-by-name';
+    
+    fetch(`/products/api/${endpoint}/?${searchParam}=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (searchType === 'barcode') {
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            } else {
+                productNameInput.value = '';
+                productNameInput.focus();
+            }
             
             if (data.error) {
                 showError(data.error);

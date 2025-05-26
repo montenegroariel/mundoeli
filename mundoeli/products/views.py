@@ -13,6 +13,10 @@ from django.db import transaction
 import json
 
 from mundoeli.products.models import Product
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+#from .serializers import ProductSerializer
 
 
 class ProductListView(ListView):
@@ -83,6 +87,40 @@ def api_search_by_barcode(request):
         ]
     }
     return JsonResponse(data)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_search_by_name(request):
+    """API endpoint para buscar productos por nombre"""
+    try:
+        name_query = request.GET.get('name', '').strip()
+        
+        if not name_query:
+            return JsonResponse({'error': 'Debes proporcionar un nombre para buscar'}, status=400)
+        
+        # Buscar productos que contengan el texto en el nombre (case-insensitive)
+        products = Product.objects.filter(
+            Q(name__icontains=name_query) & Q(active=True)
+        ).order_by('name')[:10]  # Limitamos a 10 resultados
+        
+        # Formatear los resultados
+        products_data = [{
+            'id': product.id,
+            'name': product.name,
+            'barcode': product.barcode,
+            'price': float(product.price),
+            'stock': product.stock,
+            'image': product.image.url if product.image else None
+        } for product in products]
+        
+        return JsonResponse({
+            'products': products_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': 'Error al buscar productos: ' + str(e)
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
