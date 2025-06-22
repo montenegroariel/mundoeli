@@ -288,6 +288,31 @@ async function printReceipt() {
                 await characteristicCache.writeValue(encoder.encode(line));
             }
             showMessage('Comprobante impreso correctamente', 'success');
+            // Guardar la venta en el backend
+            try {
+                // Construir el array de productos con id, cantidad y precio
+                const productosParaVenta = Array.from(document.querySelectorAll('#products-table-body tr')).map(row => {
+                    return {
+                        id: row.getAttribute('data-product-id'),
+                        quantity: parseInt(row.querySelector('input[type="number"]').value),
+                        price: parseFloat(row.querySelector('td:nth-child(4)').textContent.replace('$', ''))
+                    };
+                });
+                await fetch('/sales/api/save-sale/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        productos: productosParaVenta,
+                        total: totalAmountSpan.textContent
+                    })
+                });
+            } catch (e) {
+                console.error('Error guardando la venta:', e);
+            }
+            clearProductsList();
         } catch (error) {
             console.error('Error al imprimir:', error);
             showError('Error al imprimir el comprobante');
