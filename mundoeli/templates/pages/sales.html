@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Ventas{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Ventas</h1>
+    <!-- Buscador por fecha -->
+    <form class="row g-3 mb-4" method="get">
+        <div class="col-auto">
+            <input type="date" class="form-control" name="sales_date" value="{{ sales_date|default:'' }}" required>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary mb-3">Buscar por fecha</button>
+        </div>
+    </form>
+    {% if sales_date %}
+    <div class="card mb-4">
+        <div class="card-header">Ventas del día {{ sales_date }}</div>
+        <div class="card-body">
+            {% if sales_list %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Productos</th>
+                            <th>Total</th>
+                            <th>Métodos de Pago</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales_list %}
+                        <tr>
+                            <td>{{ sale.date|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <ul class="mb-0">
+                                    {% for detail in sale.details %}
+                                    <li>{{ detail.product.name }} x{{ detail.quantity }} (${{ detail.price }})</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                            <td>${{ sale.total }}</td>
+                            <td>
+                                <ul class="mb-0">
+                                    {% for pay in sale.payments %}
+                                    <li>{{ pay.get_payment_method_display }}: ${{ pay.amount }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="alert alert-info">
+                <strong>Total del día:</strong> ${{ total_sales }}
+            </div>
+            <div class="alert alert-secondary">
+                <strong>Totales por forma de pago:</strong>
+                <ul class="mb-0">
+                    {% for method, total in payment_summary_day.items %}
+                    <li>{{ method }}: ${{ total }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <div class="alert alert-warning mb-0">No hay ventas registradas para esta fecha.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">Ventas diarias (últimos 30 días)</div>
+                <div class="card-body">
+                    <canvas id="salesChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">Resumen por método de pago</div>
+                <div class="card-body">
+                    <canvas id="paymentsChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+    let ventas_dashboard_sales_days = {{ days|safe }};
+    let ventas_dashboard_sales_totals = {{ totals|safe }};
+    let ventas_dashboard_payment_labels = {{ payment_labels|safe }};
+    let ventas_dashboard_payment_totals = {{ payment_totals|safe }};
+
+    // Gráfico de ventas diarias
+    let ventas_dashboard_ctxSales = document.getElementById('salesChart').getContext('2d');
+    new Chart(ventas_dashboard_ctxSales, {
+        type: 'line',
+        data: {
+            labels: ventas_dashboard_sales_days,
+            datasets: [{
+                label: 'Total vendido',
+                data: ventas_dashboard_sales_totals,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    // Gráfico de ventas por método de pago
+    let ventas_dashboard_ctxPayments = document.getElementById('paymentsChart').getContext('2d');
+    new Chart(ventas_dashboard_ctxPayments, {
+        type: 'doughnut',
+        data: {
+            labels: ventas_dashboard_payment_labels,
+            datasets: [{
+                data: ventas_dashboard_payment_totals,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(255, 205, 86, 0.7)',
+                    'rgba(201, 203, 207, 0.7)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+})();
+</script>
+
+{% endblock %}
