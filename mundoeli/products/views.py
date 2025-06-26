@@ -47,6 +47,9 @@ class ProductDeleteView(DeleteView):
     success_url = "/products/"
 
 
+from django.contrib.auth.decorators import login_required
+
+@login_required
 def search_by_barcode(request):
     """Vista para mostrar el formulario de búsqueda por código de barras"""
     return render(request, 'products/search_by_barcode.html')

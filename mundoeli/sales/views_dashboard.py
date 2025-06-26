@@ -5,6 +5,9 @@ from .models import Sale, SalePayment
 import json
 from datetime import timedelta, date
 
+from django.contrib.auth.decorators import login_required
+
+@login_required
 def sales_dashboard(request):
     from .models import SaleDetail
     import datetime
