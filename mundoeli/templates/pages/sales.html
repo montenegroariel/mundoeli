@@ -30,7 +30,7 @@
                     <tbody>
                         {% for sale in sales_list %}
                         <tr>
-                            <td>{{ sale.date|date:"d/m/Y H:i" }}</td>
+                            <td>{{ sale.date|localtime|date:"d/m/Y H:i" }}</td>
                             <td>
                                 <ul class="mb-0">
                                     {% for detail in sale.details %}
