@@ -262,10 +262,17 @@ async function printReceipt() {
         let receipt = [
             '\x1B\x40',  // Inicializar impresora
             '\x1B\x61\x01',  // Centrar texto
-            'MundoEli\n',
+            // Comandos ESC/POS para doble ancho, doble alto y negrita
+            '\x1B\x45\x01', // Negrita ON
+            '\x1B\x21\x30', // Doble alto y doble ancho
+            'MUNDO ELI\n',
+            '\x1B\x21\x00', // Normal
+            '\x1B\x45\x00', // Negrita OFF
+            'Marighetti 696 - Formosa Capital\n',
+            'Whatsapp: 3704-703437\n',
+            'CONSUMIDOR FINAL\n',
             '--------------------------------\n',
-            `Fecha: ${dateStr}\n`,
-            `Hora: ${timeStr}\n`,
+            `${dateStr} - ${timeStr}\n`,
             '--------------------------------\n',
             '\x1B\x61\x00',  // Alinear a la izquierda
         ];
@@ -278,7 +285,7 @@ async function printReceipt() {
             const subtotal = parseFloat(price.replace('$', '')) * parseInt(quantity);
 
             // Formatear nombre del producto (máximo 20 caracteres)
-            const shortName = name.length > 20 ? name.substring(0, 17) + '...' : name.padEnd(20);
+            const shortName = name.length > 25 ? name.substring(0, 25) + '...' : name.padEnd(25);
             
             receipt.push(
                 `${shortName}\n`,
@@ -291,7 +298,7 @@ async function printReceipt() {
             '\x1B\x61\x01',  // Centrar texto
             `TOTAL: $${totalAmountSpan.textContent}\n`,
             '\n',
-            'Gracias por su compra!\n',
+            'Agendanos y enterate de nuestras novedades!\n',
             '\n\n\n'  // Avance de papel
         );
 
