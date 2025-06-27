@@ -45,6 +45,7 @@
                                         <th>Precio</th>
                                         <th>Stock</th>
                                         <th>Cantidad</th>
+<th>Eliminar</th>
                                     </tr>
                                 </thead>
                                 <tbody id="products-table-body">
@@ -411,6 +412,14 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTotal();
         }
     });
+    // Delegación de eventos para eliminar producto
+    productsList.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-product')) {
+            const row = e.target.closest('tr');
+            row.remove();
+            updateTotal();
+        }
+    });
 });
 
 barcodeInput.addEventListener('keyup', function(e) {
@@ -575,6 +584,10 @@ function showProducts(products) {
                 <td><input type="number" class="form-control form-control-sm" value="1" min="1"></td>
             `;
             row.setAttribute('data-product-id', product.id);
+            // Agregar botón de eliminar
+            const deleteCell = document.createElement('td');
+            deleteCell.innerHTML = `<button type="button" class="btn btn-danger btn-sm remove-product" title="Eliminar"><i class="fas fa-trash"></i></button>`;
+            row.appendChild(deleteCell);
             tbody.appendChild(row);
             console.log('Agregando nuevo producto'); // Debug
             updateTotal();
