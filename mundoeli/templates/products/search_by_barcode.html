@@ -256,7 +256,7 @@ async function printReceipt() {
 
         const now = new Date();
         const dateStr = now.toLocaleDateString();
-        const timeStr = now.toLocaleTimeString();
+        const timeStr = now.toLocaleTimeString('es-AR', { hour12: false });
         
         // Formato del comprobante (ajustado para 32 caracteres por línea - impresora 58mm)
         let receipt = [
