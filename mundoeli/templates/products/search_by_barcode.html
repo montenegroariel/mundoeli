@@ -64,8 +64,11 @@
                 <div class="card-body">
                     <div class="d-grid gap-3">
                         <button class="btn btn-info btn-lg" id="print-btn">
-                            <i class="fas fa-print me-2"></i>Imprimir Comprobante
-                        </button>
+    <i class="fas fa-print me-2"></i>Imprimir Comprobante
+</button>
+<button class="btn btn-success btn-lg" id="register-btn">
+    <i class="fas fa-check me-2"></i>Registrar Compra
+</button>
                         <div class="text-center mt-3">
                             <h4>Total: $<span id="total-amount">0.00</span></h4>
 <div class="mt-3">
@@ -374,6 +377,50 @@ printBtn.addEventListener('click', async function() {
     } catch (error) {
         console.error('Error al imprimir:', error);
         showError('Error al imprimir el comprobante: ' + error.message);
+    }
+});
+
+// Event listener para el botón de registrar compra sin imprimir
+const registerBtn = document.getElementById('register-btn');
+registerBtn.addEventListener('click', async function() {
+    if (parseFloat(totalAmountSpan.textContent) <= 0) {
+        showError('Agregue productos antes de registrar la compra');
+        return;
+    }
+    try {
+        // Recolectar productos
+        const productosParaVenta = Array.from(document.querySelectorAll('#products-table-body tr')).map(row => {
+            return {
+                id: row.getAttribute('data-product-id'),
+                quantity: parseInt(row.querySelector('input[type="number"]').value),
+                price: parseFloat(row.querySelector('td:nth-child(4)').textContent.replace('$', ''))
+            };
+        });
+        // Recolectar formas de pago
+        const paymentRows = document.querySelectorAll('#payments-container .payment-row');
+        const pagos = Array.from(paymentRows).map(row => {
+            return {
+                payment_method: row.querySelector('.payment-method').value,
+                amount: parseFloat(row.querySelector('.payment-amount').value) || 0
+            };
+        }).filter(p => p.amount > 0);
+        await fetch('/sales/api/save-sale/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                productos: productosParaVenta,
+                total: totalAmountSpan.textContent,
+                pagos: pagos
+            })
+        });
+        showMessage('Compra registrada correctamente', 'success');
+        clearProductsList();
+    } catch (error) {
+        console.error('Error al registrar la compra:', error);
+        showError('Error al registrar la compra: ' + error.message);
     }
 });
 
