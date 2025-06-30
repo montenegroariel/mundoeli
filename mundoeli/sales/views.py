@@ -15,13 +15,19 @@ def save_sale(request):
             # Crear la venta
             sale = Sale.objects.create(total=total)
 
-            # Crear los detalles de venta
+            # Crear los detalles de venta y descontar stock
             for p in productos:
                 product = Product.objects.get(id=p['id'])
+                cantidad = p['quantity']
+                if product.stock < cantidad:
+                    raise Exception(f'Stock insuficiente para el producto {product.name}')
+                # Descontar stock
+                product.stock -= cantidad
+                product.save()
                 SaleDetail.objects.create(
                     sale=sale,
                     product=product,
-                    quantity=p['quantity'],
+                    quantity=cantidad,
                     price=p['price']
                 )
 
