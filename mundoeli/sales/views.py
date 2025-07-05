@@ -12,6 +12,9 @@ def save_sale(request):
             productos = data.get('productos', [])
             pagos = data.get('pagos', [])
 
+            if not productos:
+                return JsonResponse({'error': 'Debe agregar al menos un producto para registrar la venta.'}, status=400)
+
             # Crear la venta
             sale = Sale.objects.create(total=total)
 
