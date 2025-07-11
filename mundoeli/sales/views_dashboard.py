@@ -39,16 +39,17 @@ def sales_dashboard(request):
         payment_labels.append(label)
         payment_totals.append(float(entry['total']))
 
-    # --- NUEVO: Buscador por fecha ---
-    sales_date = request.GET.get('sales_date')
+    # --- Buscador por rango de fechas ---
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
     sales_list = []
     total_sales = 0
     payment_summary_day = {}
-    if sales_date:
+    if date_from and date_to:
         try:
-            # Parse fecha a objeto date
-            filter_date = datetime.datetime.strptime(sales_date, '%Y-%m-%d').date()
-            sales = Sale.objects.filter(date__date=filter_date).order_by('-date')
+            filter_from = datetime.datetime.strptime(date_from, '%Y-%m-%d').date()
+            filter_to = datetime.datetime.strptime(date_to, '%Y-%m-%d').date()
+            sales = Sale.objects.filter(date__date__gte=filter_from, date__date__lte=filter_to).order_by('-date')
             for sale in sales:
                 details = SaleDetail.objects.filter(sale=sale)
                 sale_payments = sale.payments.all()
@@ -75,7 +76,8 @@ def sales_dashboard(request):
         'payment_totals': json.dumps(payment_totals),
         # Para el buscador:
         'sales_list': sales_list,
-        'sales_date': sales_date,
+        'date_from': date_from,
+        'date_to': date_to,
         'total_sales': total_sales,
         'payment_summary_day': payment_summary_day,
     }

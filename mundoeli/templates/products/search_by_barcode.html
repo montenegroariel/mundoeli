@@ -586,7 +586,6 @@ function searchProducts(query, searchType = 'barcode') {
             
             if (data.error) {
                 showError(data.error);
-                clearProductsList();
             } else {
                 showProducts(data.products);
                 hideMessage();
@@ -595,7 +594,6 @@ function searchProducts(query, searchType = 'barcode') {
         .catch(error => {
             console.error('Error:', error);
             showError('Error al buscar productos. Por favor, intenta nuevamente.');
-            clearProductsList();
             barcodeInput.value = '';
             barcodeInput.focus();
         });

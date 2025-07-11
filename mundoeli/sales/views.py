@@ -22,8 +22,8 @@ def save_sale(request):
             for p in productos:
                 product = Product.objects.get(id=p['id'])
                 cantidad = p['quantity']
-                if product.stock < cantidad:
-                    raise Exception(f'Stock insuficiente para el producto {product.name}')
+                #if product.stock < cantidad:
+                #    raise Exception(f'Stock insuficiente para el producto {product.name}')
                 # Descontar stock
                 product.stock -= cantidad
                 product.save()
