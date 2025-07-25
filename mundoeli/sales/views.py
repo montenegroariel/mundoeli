@@ -1,5 +1,6 @@
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
 import json
 from .models import Sale, SaleDetail, Product, SalePayment
 
@@ -45,4 +46,30 @@ def save_sale(request):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+def sales_list(request):
+    sales = Sale.objects.all().order_by('-date')
+    return render(request, 'pages/sales_list.html', {'sales': sales})
+
+
+def reprint_receipt(request, sale_id):
+    sale = get_object_or_404(Sale, id=sale_id)
+    details = SaleDetail.objects.filter(sale=sale)
+    payments = sale.payments.all()
+    # Convertir a lista serializable para impresión Bluetooth
+    details_list = [
+        {
+            "product_name": d.product.name,
+            "price": str(d.price),
+            "quantity": d.quantity
+        }
+        for d in details
+    ]
+    return render(request, 'pages/receipt.html', {
+        'sale': sale,
+        'details': details,
+        'payments': payments,
+        'details_list': details_list,
+    })
 

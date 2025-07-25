@@ -35,3 +35,4 @@ pytest-django==4.9.0  # https://github.com/pytest-dev/pytest-django
 # Rest Framework
 # ------------------------------------------------------------------------------
 djangorestframework==3.15.0  # https://github.com/encode/django-rest-framework
+debugpy==1.8.0  # https://github.com/ferrous-systems/debugpy

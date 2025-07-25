@@ -188,30 +188,6 @@ async function connectPrinter() {
     }
 }
 
-// Función para actualizar el stock de productos
-async function updateProductStock(products) {
-    try {
-        const response = await fetch('/products/api/update-stock/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ products })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al actualizar el stock');
-        }
-
-        return data;
-    } catch (error) {
-        console.error('Error al actualizar stock:', error);
-        showError('Error al actualizar el stock de productos: ' + error.message);
-        return false;
-    }
-}
 
 // Función para obtener el CSRF token
 function getCookie(name) {
@@ -239,24 +215,6 @@ async function printReceipt() {
     try {
         // Recolectar productos y cantidades
         const rows = document.querySelectorAll('#products-table-body tr');
-        const productsToUpdate = [];
-        
-        rows.forEach(row => {
-            const productId = row.getAttribute('data-product-id');
-            const quantity = parseInt(row.querySelector('input[type="number"]').value);
-            if (quantity > 0) {
-                productsToUpdate.push({
-                    id: productId,
-                    quantity: quantity
-                });
-            }
-        });
-
-        // Actualizar el stock antes de imprimir
-        const stockUpdated = await updateProductStock(productsToUpdate);
-        if (!stockUpdated) {
-            throw new Error('No se pudo actualizar el stock');
-        }
 
         const now = new Date();
         const dateStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });

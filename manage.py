@@ -3,16 +3,21 @@
 import os
 import sys
 from pathlib import Path
+from django.conf import settings
 
 if __name__ == "__main__":
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 
+    if settings.DEBUG:
+        # Check for main process to avoid issues with reloaders
+        if os.environ.get('RUN_MAIN') or os.environ.get('WERKZEUG_RUN_MAIN'):
+            import debugpy
+            debugpy.listen(("0.0.0.0", 5679)) # Choose a port, e.g., 5678
+            print('Debugpy attached!')
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError:
-        # The above import may fail for some other reason. Ensure that the
-        # issue is really that Django is missing to avoid masking other
-        # exceptions on Python 2.
         try:
             import django
         except ImportError:
@@ -21,7 +26,6 @@ if __name__ == "__main__":
                 "available on your PYTHONPATH environment variable? Did you "
                 "forget to activate a virtual environment?"
             )
-
         raise
 
     # This allows easy placement of apps within the interior

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Comprobante de Venta{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h3>Comprobante de Venta #{{ sale.id }}</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Fecha/Hora:</strong> {{ sale.date|date:"d/m/Y H:i" }}</p>
+            <p><strong>Total:</strong> ${{ sale.total }}</p>
+            <h5>Productos:</h5>
+            <ul>
+                {% for d in details %}
+                <li>{{ d.product.name }} x{{ d.quantity }} - ${{ d.price }}</li>
+                {% endfor %}
+            </ul>
+            <h5>Métodos de Pago:</h5>
+            <ul>
+                {% for p in payments %}
+                <li>{{ p.get_payment_method_display }}: ${{ p.amount }}</li>
+                {% endfor %}
+            </ul>
+            <button class="btn btn-primary" onclick="window.print()">Imprimir</button>
+            <button class="btn btn-info" id="bluetooth-print-btn">
+                <i class="fas fa-bluetooth-b"></i> Imprimir por Bluetooth
+            </button>
+            <a href="{% url 'sales_list' %}" class="btn btn-secondary">Volver al listado</a>
+
+            <div id="bluetooth-print-message" class="alert mt-3" style="display:none;"></div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+<script id="receipt-products" type="application/json">{{ details_list|json_script:"receipt-products" }}</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+console.log('DOM fully loaded');
+const el = document.getElementById('receipt-products');
+console.log('receipt-products element:', el);
+console.log('receipt-products text:', el ? el.textContent : 'NO ELEMENT');
+let receiptProducts = [];
+try {
+    receiptProducts = JSON.parse(el.textContent);
+} catch (e) {
+    console.error('Error al parsear receipt-products:', e);
+    showBluetoothMessage('Error en los datos de productos para impresión: ' + e.message, 'danger');
+}
+const receiptTotal = '{{ sale.total }}';
+// --- Web Bluetooth ESC/POS Print Logic ---
+let bluetoothDevice = null;
+let characteristicCache = null;
+
+function isWebBluetoothSupported() {
+    return !!navigator.bluetooth;
+}
+
+async function connectPrinter() {
+    if (!isWebBluetoothSupported()) {
+        showBluetoothMessage('Tu navegador no soporta Bluetooth. Usa Chrome, Edge o similar.', 'danger');
+        return false;
+    }
+    try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            filters: [
+                { namePrefix: 'IT01' },
+                { namePrefix: 'Printer' }
+            ],
+            optionalServices: ['generic_access', 'generic_attribute', '000018f0-0000-1000-8000-00805f9b34fb']
+        });
+        const server = await bluetoothDevice.gatt.connect();
+        const services = await server.getPrimaryServices();
+        for (const service of services) {
+            const characteristics = await service.getCharacteristics();
+            for (const characteristic of characteristics) {
+                if (characteristic.properties.write) {
+                    characteristicCache = characteristic;
+                }
+            }
+        }
+        if (!characteristicCache) throw new Error('No se encontró una característica con permisos de escritura');
+        return true;
+    } catch (error) {
+        showBluetoothMessage('Error al conectar con la impresora: ' + error.message, 'danger');
+        return false;
+    }
+}
+
+function showBluetoothMessage(msg, type='info') {
+    const div = document.getElementById('bluetooth-print-message');
+    div.textContent = msg;
+    div.className = `alert alert-${type} mt-3`;
+    div.style.display = 'block';
+}
+
+// --- PASAR PRODUCTOS Y DATOS DESDE DJANGO A JS ---
+// (declaración única, ya incluida arriba con logs y try/catch)
+
+
+async function printReceiptBluetooth() {
+    if (!characteristicCache) {
+        showBluetoothMessage('Conectando con la impresora...', 'info');
+        const connected = await connectPrinter();
+        if (!connected) return;
+    }
+    try {
+        // Construir el comprobante ESC/POS
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('es-AR', { hour12: false });
+        let receipt = [
+            '\x1B\x40',  // Inicializar impresora
+            '\x1B\x61\x01',  // Centrar texto
+            '\x1B\x45\x01', // Negrita ON
+            '\x1B\x21\x30', // Doble alto y ancho
+            'MUNDO ELI\n',
+            '\x1B\x21\x00', // Normal
+            '\x1B\x45\x00', // Negrita OFF
+            'Marighetti 696 - Formosa Capital\n',
+            'Whatsapp: 3704-703437\n',
+            'CONSUMIDOR FINAL\n',
+            '--------------------------------\n',
+            `${dateStr} - ${timeStr}\n`,
+            '--------------------------------\n',
+            '\x1B\x61\x00',  // Alinear a la izquierda
+        ];
+        // Productos
+        receiptProducts.forEach(function(d) {
+            const name = d.product_name;
+            const price = d.price;
+            const quantity = d.quantity;
+            const subtotal = (parseFloat(price) * parseInt(quantity)).toFixed(2);
+            const shortName = name.length > 25 ? name.substring(0, 25) + '...' : name.padEnd(25);
+            receipt.push(`${shortName}\n`, `${quantity}x $${price} = $${subtotal}\n`);
+        });
+        receipt.push(
+            '--------------------------------\n',
+            '\x1B\x61\x02',  // Alinear a la derecha
+            `TOTAL: $${receiptTotal}\n`,
+            '\x1B\x61\x01',  // Volver a centrar
+            '\n',
+            'Agendanos y enterate de nuestras novedades!\n',
+            '--------------------------------\n',
+            '\x1B\x61\x01', // Centrar texto
+            '\x1B\x21\x00', // Fuente normal
+            'DOCUMENTO NO VALIDO COMO FACTURA\n',
+            '\n\n\n'
+        );
+        // Enviar a la impresora
+        const encoder = new TextEncoder();
+        for (const line of receipt) {
+            await characteristicCache.writeValue(encoder.encode(line));
+        }
+        showBluetoothMessage('Comprobante impreso correctamente', 'success');
+    } catch (error) {
+        showBluetoothMessage('Error al imprimir: ' + error.message, 'danger');
+    }
+}
+
+document.getElementById('bluetooth-print-btn').addEventListener('click', function() {
+    alert('Intentando conectar con la impresora...');
+    showBluetoothMessage('Intentando conectar con la impresora...', 'info');
+    console.log('Botón Bluetooth presionado, iniciando impresión...');
+    printReceiptBluetooth();
+});
+});
+            </script>
+         </div>
+     </div>
+ </div>
