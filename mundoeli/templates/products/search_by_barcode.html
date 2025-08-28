@@ -3,7 +3,13 @@
 {% block title %}Buscar por Código de Barras{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container mt-5">
+    <div class="mb-3 text-end">
+        <a href="{% url 'listar_borradores_orden' %}" class="btn btn-outline-primary">
+            <i class="fas fa-clipboard-list me-2"></i>Ordenes
+        </a>
+    </div>
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
@@ -69,6 +75,50 @@
 <button class="btn btn-success btn-lg" id="register-btn">
     <i class="fas fa-check me-2"></i>Registrar Compra
 </button>
+<button class="btn btn-secondary btn-lg mt-2" id="save-order-btn">
+    <i class="fas fa-save me-2"></i>Guardar Orden
+</button>
+<script>
+document.getElementById('save-order-btn').addEventListener('click', async function() {
+    const productos = Array.from(document.querySelectorAll('#products-table-body tr')).map(row => {
+        return {
+            id: row.getAttribute('data-product-id'),
+            name: row.querySelector('td:nth-child(2)').textContent,
+            quantity: parseInt(row.querySelector('input[type="number"]').value),
+            price: parseFloat(row.querySelector('td:nth-child(4)').textContent.replace('$', ''))
+        };
+    });
+    if (productos.length === 0) {
+        showError('Agregue productos antes de guardar la orden.');
+        return;
+    }
+    const pagos = Array.from(document.querySelectorAll('#payments-container .payment-row')).map(row => {
+        return {
+            method: row.querySelector('.payment-method').value,
+            amount: parseFloat(row.querySelector('.payment-amount').value) || 0
+        };
+    }).filter(p => p.amount > 0);
+    try {
+        const response = await fetch("/sales/api/guardar-borrador-orden/", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ productos, pagos })
+        });
+        const data = await response.json();
+        if (response.ok && data.status === 'ok') {
+            showMessage('Orden guardada correctamente.', 'success');
+            clearProductsList();
+        } else {
+            showError(data.error || 'Error al guardar la orden.');
+        }
+    } catch (error) {
+        showError('Error al guardar la orden: ' + error.message);
+    }
+});
+</script>
                         <div class="text-center mt-3">
                             <h4>Total: $<span id="total-amount">0.00</span></h4>
 <div class="mt-3">
@@ -104,6 +154,49 @@
 
 {% block inline_javascript %}
 <script>
+// --- INICIO: Cargar borrador si existe en localStorage ---
+document.addEventListener('DOMContentLoaded', function() {
+    const draftOrderStr = localStorage.getItem('draftOrder');
+    if (draftOrderStr) {
+        try {
+            const draftOrder = JSON.parse(draftOrderStr);
+            if (draftOrder.products && Array.isArray(draftOrder.products)) {
+                showProducts(draftOrder.products);
+            }
+            if (draftOrder.payments && Array.isArray(draftOrder.payments)) {
+                // Limpiar pagos actuales
+                const paymentsContainer = document.getElementById('payments-container');
+                paymentsContainer.innerHTML = '';
+                draftOrder.payments.forEach((p, idx) => {
+                    const paymentRow = document.createElement('div');
+                    paymentRow.className = 'row mb-2 payment-row';
+                    paymentRow.innerHTML = `
+                        <div class="col-7">
+                            <select class="form-select payment-method">
+                                <option value="mercadopago" ${p.method === 'mercadopago' ? 'selected' : ''}>Mercadopago</option>
+                                <option value="efectivo" ${p.method === 'efectivo' ? 'selected' : ''}>Efectivo</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <input type="number" min="0" step="0.01" class="form-control payment-amount" placeholder="Monto" value="${p.amount}">
+                        </div>
+                        <div class="col-1 d-flex align-items-center">
+                            <button type="button" class="btn btn-danger btn-sm remove-payment" title="Eliminar"><i class="fas fa-trash"></i></button>
+                        </div>
+                    `;
+                    paymentsContainer.appendChild(paymentRow);
+                });
+            }
+            updateTotal();
+            // Limpiar borrador para evitar recarga accidental
+            localStorage.removeItem('draftOrder');
+        } catch (e) {
+            console.error('Error al cargar el borrador:', e);
+        }
+    }
+});
+// --- FIN: Cargar borrador si existe en localStorage ---
+
 const barcodeInput = document.getElementById('barcode');
 const totalAmountSpan = document.getElementById('total-amount');
 const printBtn = document.getElementById('print-btn');

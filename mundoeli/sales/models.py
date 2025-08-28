@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from mundoeli.products.models import Product
 
 class Sale(models.Model):
@@ -33,3 +34,14 @@ class SaleDetail(models.Model):
     class Meta:
         verbose_name = "Detalle de Venta"
         verbose_name_plural = "Detalles de Venta"
+
+class OrderDraft(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='order_drafts')
+    products = models.JSONField(help_text='Lista de productos y cantidades')
+    payments = models.JSONField(blank=True, null=True, help_text='Opciones de pago')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, help_text='El borrador sigue disponible')
+
+    def __str__(self):
+        return f"Borrador #{self.id} de {self.user}"

@@ -2,7 +2,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 import json
-from .models import Sale, SaleDetail, Product, SalePayment
+from .models import Sale, SaleDetail, Product, SalePayment, OrderDraft
+from django.contrib.auth.decorators import login_required
 
 @csrf_exempt
 def save_sale(request):
@@ -47,6 +48,62 @@ def save_sale(request):
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Método no permitido'}, status=405)
 
+
+from django.http import HttpResponse
+
+from .api_utils import api_login_required
+
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def guardar_borrador_orden(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            productos = data.get('productos', [])
+            pagos = data.get('pagos', [])
+            # Guardar como JSON
+            draft = OrderDraft.objects.create(
+                user=request.user,
+                products=productos,
+                payments=pagos,
+            )
+            return JsonResponse({'status': 'ok', 'draft_id': draft.id})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+@login_required
+def cargar_borrador_orden(request, draft_id):
+    draft = get_object_or_404(OrderDraft, id=draft_id, user=request.user, is_active=True)
+    # Marcar como inactivo al cargar
+    draft.is_active = False
+    draft.save(update_fields=["is_active"])
+    return JsonResponse({
+        'id': draft.id,
+        'products': draft.products,
+        'payments': draft.payments,
+        'created_at': draft.created_at.strftime('%Y-%m-%d %H:%M'),
+        'updated_at': draft.updated_at.strftime('%Y-%m-%d %H:%M'),
+    })
+
+@login_required
+def listar_borradores_orden(request):
+    drafts = OrderDraft.objects.filter(user=request.user, is_active=True).order_by('-updated_at')
+    # Para API
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.GET.get('api'):
+        draft_list = [
+            {
+                'id': d.id,
+                'created_at': d.created_at.strftime('%Y-%m-%d %H:%M'),
+                'updated_at': d.updated_at.strftime('%Y-%m-%d %H:%M'),
+                'products': d.products,
+                'payments': d.payments,
+            } for d in drafts
+        ]
+        return JsonResponse({'drafts': draft_list})
+    # Para vista HTML
+    return render(request, 'sales/order_drafts.html', {'drafts': drafts})
 
 def sales_list(request):
     sales = Sale.objects.all().order_by('-date')
