@@ -22,3 +22,21 @@ class LogEntryAdmin(admin.ModelAdmin):
         "action_flag",
         "change_message",
     )
+
+    # 🚫 Evitar eliminación de logs
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    # 🚫 También evitar agregar/editar logs (recomendado)
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    # 🚫 Quitar la acción "eliminar seleccionados"
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
