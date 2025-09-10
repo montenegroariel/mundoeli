@@ -53,7 +53,7 @@ def sales_dashboard(request):
             sales_qs = Sale.objects.filter(date__date__gte=filter_from, date__date__lte=filter_to).order_by('-date')
             product_id = request.GET.get('product_id')
             if product_id:
-                sales_qs = sales_qs.filter(details__product_id=product_id)
+                sales_qs = sales_qs.filter(saledetail__product_id=product_id)
             for sale in sales_qs:
                 details = SaleDetail.objects.filter(sale=sale)
                 if product_id:
