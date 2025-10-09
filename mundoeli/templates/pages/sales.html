@@ -87,6 +87,41 @@
             {% endif %}
         </div>
     </div>
+    <!-- Listados Top/Bottom 10 dentro del rango -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Top 10 artículos más vendidos</div>
+                <div class="card-body">
+                    {% if top_products %}
+                    <ol class="mb-0">
+                        {% for p in top_products %}
+                        <li>{{ p.product__name }} <span class="text-muted">(x{{ p.total_qty }})</span></li>
+                        {% endfor %}
+                    </ol>
+                    {% else %}
+                    <div class="text-muted">Sin datos en el rango seleccionado.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Top 10 artículos menos vendidos</div>
+                <div class="card-body">
+                    {% if bottom_products %}
+                    <ol class="mb-0">
+                        {% for p in bottom_products %}
+                        <li>{{ p.product__name }} <span class="text-muted">(x{{ p.total_qty }})</span></li>
+                        {% endfor %}
+                    </ol>
+                    {% else %}
+                    <div class="text-muted">Sin datos en el rango seleccionado.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
     {% endif %}
     <div class="row mb-4">
         <div class="col-md-8">

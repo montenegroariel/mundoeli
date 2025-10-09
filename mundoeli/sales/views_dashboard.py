@@ -84,10 +84,21 @@ def sales_dashboard(request):
                     for pay in sale_payments:
                         label = dict(SalePayment.PAYMENT_METHOD_CHOICES).get(pay.payment_method, pay.payment_method)
                         payment_summary_day[label] = payment_summary_day.get(label, 0) + float(pay.amount)
+            # Top/Bottom 10 productos por cantidad vendida en el rango
+            product_sales_qs = (
+                SaleDetail.objects
+                .filter(sale__date__date__gte=filter_from, sale__date__date__lte=filter_to)
+                .values('product__id', 'product__name')
+                .annotate(total_qty=Sum('quantity'))
+            )
+            top_products = list(product_sales_qs.order_by('-total_qty')[:10])
+            bottom_products = list(product_sales_qs.order_by('total_qty')[:10])
         except Exception as e:
             sales_list = []
             total_sales = 0
             payment_summary_day = {}
+            top_products = []
+            bottom_products = []
     from mundoeli.products.models import Product
     products = Product.objects.filter(active=True).order_by('name')
     context = {
@@ -103,5 +114,7 @@ def sales_dashboard(request):
         'payment_summary_day': payment_summary_day,
         'total_profit': total_profit,
         'products': products,
+        'top_products': top_products if date_from and date_to else [],
+        'bottom_products': bottom_products if date_from and date_to else [],
     }
     return render(request, 'pages/sales.html', context)
