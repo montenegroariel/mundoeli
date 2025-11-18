@@ -1,9 +1,17 @@
 from django.contrib import admin
 from .models import Product
+from import_export import resources  
+from import_export.admin import ImportExportMixin
 
-# Register your models here.
+
+class ProductResource(resources.ModelResource):
+    class Meta:
+        model = Product
+        fields = ('name','cost','description','barcode', 'price', 'stock', 'active', 'id',)
+
+
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(ImportExportMixin, admin.ModelAdmin):
     list_display = ("name", "barcode", "price", "stock", "active")
     list_filter = ("active", "stock")
     search_fields = ("name", "barcode", "description")

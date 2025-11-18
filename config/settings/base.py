@@ -79,6 +79,7 @@ THIRD_PARTY_APPS = [
     "allauth.mfa",
     "allauth.socialaccount",
     "rest_framework",
+    "import_export",
 ]
 
 LOCAL_APPS = [
